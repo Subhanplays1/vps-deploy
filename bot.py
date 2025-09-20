@@ -40,7 +40,7 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('UnixNodesBot')
+logger = logging.getLogger('RAGEHOSTINGBOT')
 
 # Load environment variables
 load_dotenv()
