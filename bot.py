@@ -36,7 +36,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('unixnodes_bot.log'),
+        logging.FileHandler('ragehosting_bot.log'),
         logging.StreamHandler()
     ]
 )
@@ -49,14 +49,10 @@ load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 ADMIN_IDS = {int(id_) for id_ in os.getenv('ADMIN_IDS', '1210291131301101618').split(',') if id_.strip()}
 ADMIN_ROLE_ID = int(os.getenv('ADMIN_ROLE_ID', '1376177459870961694'))
-WATERMARK = "UnixNodes VPS Service"
-WELCOME_MESSAGE = "Welcome To UnixNodes! Get Started With Us!"
-MAX_VPS_PER_USER = int(os.getenv('MAX_VPS_PER_USER', '3'))
-DEFAULT_OS_IMAGE = os.getenv('DEFAULT_OS_IMAGE', 'ubuntu:22.04')
-DOCKER_NETWORK = os.getenv('DOCKER_NETWORK', 'bridge')
-MAX_CONTAINERS = int(os.getenv('MAX_CONTAINERS', '100'))
-DB_FILE = 'unixnodes.db'
-BACKUP_FILE = 'unixnodes_backup.pkl'
+WATERMARK = "Rage Hosting VPS Service"
+WELCOME_MESSAGE = "Welcome To Rage Hosting! Get Started With Us!"
+DB_FILE = 'ragehosting.db'
+BACKUP_FILE = 'ragehosting_backup.pkl'
 
 # Known miner process names/patterns
 MINER_PATTERNS = [
@@ -96,11 +92,11 @@ RUN mkdir /var/run/sshd && \\
 RUN systemctl enable ssh && \\
     systemctl enable docker
 
-# UnixNodes customization
+# Rage Hosting customization
 RUN echo '{welcome_message}' > /etc/motd && \\
     echo 'echo "{welcome_message}"' >> /home/{username}/.bashrc && \\
     echo '{watermark}' > /etc/machine-info && \\
-    echo 'unixnodes-{vps_id}' > /etc/hostname
+    echo 'ragehosting-{vps_id}' > /etc/hostname
 
 # Install additional useful packages
 RUN apt-get update && \\
@@ -724,7 +720,7 @@ async def setup_container(container_id, status_msg, memory, username, vps_id=Non
         # Set hostname and watermark
         if not vps_id:
             vps_id = generate_vps_id()
-        hostname_cmd = f"echo 'unixnodes-{vps_id}' > /etc/hostname && hostname unixnodes-{vps_id}"
+        hostname_cmd = f"echo 'ragehosting-{vps_id}' > /etc/hostname && hostname ragehosting-{vps_id}"
         success, output = await run_docker_command(container_id, ["bash", "-c", hostname_cmd])
         if not success:
             raise Exception(f"Failed to set hostname: {output}")
@@ -799,7 +795,7 @@ async def on_ready():
                     logger.error(f"Error starting container: {e}")
     
     try:
-        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="UnixNodes VPS"))
+        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Rage Hostings"))
         synced_commands = await bot.tree.sync()
         logger.info(f"Synced {len(synced_commands)} slash commands")
     except Exception as e:
@@ -1539,7 +1535,7 @@ async def set_container_limit(ctx, max_limit: int):
     if ctx.author.id != 1210291131301101618:  # Only the owner can set limit
         await ctx.send("❌ Only the owner can set container limit!", ephemeral=True)
         return
-    
+
     if max_limit < 1 or max_limit > 1000:
         await ctx.send("❌ Container limit must be between 1 and 1000", ephemeral=True)
         return
@@ -1968,7 +1964,7 @@ async def edit_vps(ctx, vps_id: str, memory: Optional[int] = None, cpu: Optional
 
             updates['container_id'] = new_container.id
             await asyncio.sleep(5)
-            setup_success, _, _ = await setup_container(
+            setup_success, ssh_password, _ = await setup_container(
                 new_container.id, 
                 ctx, 
                 memory or vps['memory'], 
@@ -1977,7 +1973,9 @@ async def edit_vps(ctx, vps_id: str, memory: Optional[int] = None, cpu: Optional
                 use_custom_image=vps['use_custom_image']
             )
             if not setup_success:
-                raise Exception("Failed to setup new container")
+                raise Exception("Failed to setup container")
+                
+            bot.db.update_vps(token, {'password': ssh_password})
         except Exception as e:
             await ctx.send(f"❌ Error updating container: {str(e)}")
             return
@@ -2370,7 +2368,7 @@ class OSSelectionView(ui.View):
                     tty=True,
                     network=DOCKER_NETWORK,
                     volumes={
-                        f'unixnodes-{self.vps_id}': {'bind': '/data', 'mode': 'rw'}
+                        f'unixnodes-{vps_id}': {'bind': '/data', 'mode': 'rw'}
                     }
                 )
             except docker.errors.ImageNotFound:
@@ -2388,7 +2386,7 @@ class OSSelectionView(ui.View):
                     tty=True,
                     network=DOCKER_NETWORK,
                     volumes={
-                        f'unixnodes-{self.vps_id}': {'bind': '/data', 'mode': 'rw'}
+                        f'unixnodes-{vps_id}': {'bind': '/data', 'mode': 'rw'}
                     }
                 )
                 image = DEFAULT_OS_IMAGE
@@ -2645,10 +2643,6 @@ async def on_command_error(ctx, error):
 
 # Run the bot
 if __name__ == "__main__":
-    if TOKEN is None:
-        logger.error("DISCORD_TOKEN not found! Check your .env file.")
-        raise ValueError("DISCORD_TOKEN not found in environment.")
-
     try:
         # Create directories if they don't exist
         os.makedirs("temp_dockerfiles", exist_ok=True)
@@ -2658,4 +2652,3 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Bot crashed: {e}")
         traceback.print_exc()
-
