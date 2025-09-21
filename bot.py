@@ -2645,6 +2645,10 @@ async def on_command_error(ctx, error):
 
 # Run the bot
 if __name__ == "__main__":
+    if TOKEN is None:
+        logger.error("DISCORD_TOKEN not found! Check your .env file.")
+        raise ValueError("DISCORD_TOKEN not found in environment.")
+
     try:
         # Create directories if they don't exist
         os.makedirs("temp_dockerfiles", exist_ok=True)
@@ -2654,3 +2658,4 @@ if __name__ == "__main__":
     except Exception as e:
         logger.error(f"Bot crashed: {e}")
         traceback.print_exc()
+
